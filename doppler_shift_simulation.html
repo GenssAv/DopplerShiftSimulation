@@ -1,0 +1,580 @@
+<div class="sim-header">
+  <h1>DOPPLER SHIFT SIMULATION</h1>
+  <p>Mechanical Waves & Acoustic Frequency Shift Engine</p>
+</div>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family: system-ui, -apple-system, sans-serif;}
+body { background: #1e293b; color: #f8fafc; padding: 20px; } 
+
+.sim-header {
+  text-align: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #334155;
+}
+.sim-header h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #f8fafc;
+  margin-bottom: 4px;
+}
+.sim-header p {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.row{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.row label{font-size:13px;color:#cbd5e1;min-width:148px;}
+.row input[type=range]{flex:1; cursor: pointer;}
+.val{font-size:13px;font-weight:500;color:#f8fafc;min-width:72px;text-align:right;}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:12px 0;}
+.mc{background:#334155;border-radius:8px;padding:9px 11px;}
+.ml{font-size:11px;color:#94a3b8;margin-bottom:2px;}
+.mv{font-size:21px;font-weight:500;color:#f8fafc;}
+.mu{font-size:11px;color:#94a3b8;}
+.mv.blue{color:#38bdf8;}  
+.mv.red{color:#f97316;}   
+.mv.green{color:#10b981;} 
+canvas{display:block;border-radius:8px;border:1px solid #475569;}
+.btn-row{display:flex;gap:8px;margin:10px 0;}
+
+button {
+  padding: 8px 18px;
+  font-size: 13px;
+  border: 1px solid #3b82f6; 
+  border-radius: 6px;
+  background: #1e293b;
+  color: #3b82f6;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+button:hover {
+  background: #2563eb;
+  color: #ffffff;
+}
+button.on {
+  background: #3b82f6;
+  color: #ffffff;
+  border-color: transparent;
+}
+.scenario-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.sc{padding:6px 12px;font-size:12px;border:1px solid #475569;border-radius:6px;background:#334155;color:#cbd5e1;cursor:pointer;}
+.sc:hover, .sc.on{background:#3b82f6;color:#ffffff;border-color:#3b82f6;}
+.verdict{font-size:13px;color:#cbd5e1;margin:6px 0 2px;}
+
+/* Enlarged Formula Layout Styling */
+.formula {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #f1f5f9;
+  background: #1e293b;
+  border: 2px solid #475569;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-top: 16px;
+  text-align: center;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+}
+
+#btn-audio {
+  border-color: #eab308;
+  color: #eab308;
+}
+#btn-audio:hover {
+  background: #eab308;
+  color: #1e293b;
+}
+#btn-audio.on {
+  background: #eab308;
+  color: #1e293b;
+  border-color: transparent;
+}
+</style>
+
+<div style="padding:0.5rem 0 1rem;">
+
+<div class="scenario-row" id="scenarios">
+  <button class="sc on" onclick="setScenario('car')">Race car</button>
+  <button class="sc" onclick="setScenario('train')">Train horn</button>
+  <button class="sc" onclick="setScenario('ambulance')">Ambulance</button>
+  <button class="sc" onclick="setScenario('jet')">Jet</button>
+  <button class="sc" onclick="setScenario('custom')">Custom</button>
+</div>
+
+<canvas id="mainCanvas" width="660" height="220" style="width:100%;margin-bottom:12px;"></canvas>
+<canvas id="waveCanvas" width="660" height="70" style="width:100%;margin-bottom:10px;"></canvas>
+
+<div class="metrics">
+  <div class="mc"><div class="ml">Source freq f₀</div><div class="mv green" id="m-f0">440</div><div class="mu">Hz</div></div>
+  <div class="mc"><div class="ml">Approaching f'</div><div class="mv red" id="m-fa">504</div><div class="mu">Hz (higher)</div></div>
+  <div class="mc"><div class="ml">Receding f'</div><div class="mv blue" id="m-fr">390</div><div class="mu">Hz (lower)</div></div>
+  <div class="mc"><div class="ml">Mach number</div><div class="mv" id="m-mach">0.15</div><div class="mu"></div></div>
+  <div class="mc"><div class="ml">Source speed</div><div class="mv" id="m-vs">50</div><div class="mu">m/s</div></div>
+</div>
+
+<div class="verdict" id="verdict">Source approaching: wavefronts compress → higher pitch. Receding: wavefronts stretch → lower pitch.</div>
+
+<div class="row" style="margin-top:10px;">
+  <label>Source frequency f₀ (Hz)</label>
+  <input type="range" min="100" max="1000" step="10" value="440" id="sl-f0" oninput="onSlide()">
+  <span class="val" id="vl-f0">440 Hz</span>
+</div>
+<div class="row">
+  <label>Source speed vₛ (m/s)</label>
+  <input type="range" min="0" max="380" step="5" value="50" id="sl-vs" oninput="onSlide()">
+  <span class="val" id="vl-vs">50 m/s</span>
+</div>
+<div class="row">
+  <label>Sound speed v (m/s)</label>
+  <input type="range" min="300" max="400" step="5" value="343" id="sl-v" oninput="onSlide()">
+  <span class="val" id="vl-v">343 m/s</span>
+</div>
+<div class="row">
+  <label>Observer speed v₀ (m/s)</label>
+  <input type="range" min="0" max="100" step="5" value="0" id="sl-vo" oninput="onSlide()">
+  <span class="val" id="vl-vo">0 m/s</span>
+</div>
+
+<div class="btn-row">
+  <button id="btn-play" onclick="togglePlay()">Play Animation</button>
+  <button id="btn-audio" onclick="toggleAudio()">Mute Sound</button>
+  <button onclick="resetSim()">Reset</button>
+</div>
+
+<div class="formula">f' = f₀ · (v ± v₀) / (v ∓ vₛ) &nbsp;&nbsp;|&nbsp;&nbsp; Mach = vₛ / v</div>
+</div>
+
+<script>
+const scenarios = {
+  car:       {f0:420,  vs:65,  v:343, vo:0, type:'car',       waveForm:'sawtooth'},
+  train:     {f0:300,  vs:35,  v:343, vo:0, type:'train',     waveForm:'triangle'},
+  ambulance: {f0:680,  vs:20,  v:343, vo:0, type:'ambulance', waveForm:'sine'},
+  jet:       {f0:180,  vs:350, v:343, vo:0, type:'jet',       waveForm:'sawtooth'},
+  custom:    {f0:440,  vs:50,  v:343, vo:0, type:'custom',    waveForm:'triangle'},
+};
+
+let currentScenario = 'car';
+let playing = false, raf = null, time = 0;
+let sourceX = 0.05;
+let waves = [];
+let lastWaveTime = 0;
+
+let audioCtx = null;
+let mainOsc = null;
+let subOsc = null; 
+let mainGain = null;
+let audioEnabled = false;
+let sonicBoomTriggered = false;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  mainOsc = audioCtx.createOscillator();
+  subOsc = audioCtx.createOscillator();
+  mainGain = audioCtx.createGain();
+  
+  mainGain.gain.setValueAtTime(0, audioCtx.currentTime);
+  
+  mainOsc.connect(mainGain);
+  subOsc.connect(mainGain);
+  mainGain.connect(audioCtx.destination);
+  
+  mainOsc.start();
+  subOsc.start();
+}
+
+function toggleAudio() {
+  if (!audioCtx) initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  
+  audioEnabled = !audioEnabled;
+  const btn = document.getElementById('btn-audio');
+  if (audioEnabled) {
+    btn.textContent = 'Unmute Sound';
+    btn.classList.add('on');
+  } else {
+    btn.textContent = 'Mute Sound';
+    btn.classList.remove('on');
+    if (mainGain) mainGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.02);
+  }
+}
+
+function setScenario(key) {
+  currentScenario = key;
+  const s = scenarios[key];
+  document.getElementById('sl-f0').value = s.f0;
+  document.getElementById('sl-vs').value = s.vs;
+  document.getElementById('sl-v').value  = s.v;
+  document.getElementById('sl-vo').value = s.vo;
+  document.querySelectorAll('.sc').forEach(b => b.classList.remove('on'));
+  if (event && event.target) {
+    event.target.closest('.sc').classList.add('on');
+  }
+  resetSim();
+  onSlide();
+}
+
+function getParams() {
+  return {
+    f0: parseFloat(document.getElementById('sl-f0').value),
+    vs: parseFloat(document.getElementById('sl-vs').value),
+    v:  parseFloat(document.getElementById('sl-v').value),
+    vo: parseFloat(document.getElementById('sl-vo').value),
+  };
+}
+
+function onSlide() {
+  const p = getParams();
+  document.getElementById('vl-f0').textContent = p.f0 + ' Hz';
+  document.getElementById('vl-vs').textContent = p.vs + ' m/s';
+  document.getElementById('vl-v').textContent  = p.v  + ' m/s';
+  document.getElementById('vl-vo').textContent = p.vo + ' m/s';
+  updateMetrics(p);
+  if (!playing) { drawMain(p); drawWave(p); }
+}
+
+function updateMetrics(p) {
+  const {f0, vs, v, vo} = p;
+  const safe_vs = Math.min(vs, v * 0.99);
+  const fa = f0 * (v + vo) / (v - safe_vs);
+  const fr = f0 * (v - vo) / (v + safe_vs);
+  const mach = (vs / v).toFixed(2);
+  document.getElementById('m-f0').textContent   = Math.round(f0);
+  document.getElementById('m-fa').textContent   = isFinite(fa) ? Math.round(fa) : '∞';
+  document.getElementById('m-fr').textContent   = Math.round(fr);
+  document.getElementById('m-mach').textContent = mach;
+  document.getElementById('m-vs').textContent   = Math.round(vs);
+
+  const vd = document.getElementById('verdict');
+  if (vs === 0) vd.textContent = 'Source is stationary — no Doppler shift.';
+  else if (vs >= v) vd.textContent = 'Mach 1+ Supersonic Shockwave! Notice how the sound stays completely behind the vehicle.';
+  else vd.textContent = `Approaching: wavefronts compress → ${Math.round(fa)} Hz. Receding: wavefronts stretch → ${Math.round(fr)} Hz.`;
+}
+
+function resetSim() {
+  playing = false;
+  if (raf) cancelAnimationFrame(raf);
+  time = 0; sourceX = 0.05; waves = []; lastWaveTime = 0; sonicBoomTriggered = false;
+  const btn = document.getElementById('btn-play');
+  btn.textContent = 'Play Animation';
+  btn.classList.remove('on');
+  if (mainGain) mainGain.gain.setValueAtTime(0, audioCtx ? audioCtx.currentTime : 0);
+  const p = getParams();
+  drawMain(p); drawWave(p);
+}
+
+function togglePlay() {
+  playing = !playing;
+  const btn = document.getElementById('btn-play');
+  if (playing) {
+    btn.textContent = 'Pause Animation';
+    btn.classList.add('on');
+    if (!audioCtx) initAudio();
+    animate();
+  } else {
+    btn.textContent = 'Play Animation';
+    btn.classList.remove('on');
+    if (mainGain) mainGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+    if (raf) cancelAnimationFrame(raf);
+  }
+}
+
+function animate() {
+  if (!playing) return;
+  const dt = 0.016;
+  time += dt;
+  const p = getParams();
+  const scale = 180;
+  const vNorm = p.vs / scale;
+  sourceX += vNorm * dt;
+  
+  if (sourceX > 1.15) { 
+    sourceX = 0.05; 
+    waves = []; 
+    lastWaveTime = time; 
+    sonicBoomTriggered = false;
+  }
+
+  const waveInterval = 1 / (p.f0 / 25);
+  if (time - lastWaveTime >= waveInterval && p.vs < p.v) {
+    waves.push({ cx: sourceX, age: 0 });
+    lastWaveTime = time;
+    if (waves.length > 25) waves.shift();
+  }
+  const waveSpeed = p.v / scale;
+  waves.forEach(w => { w.age += dt; w.r = w.age * waveSpeed; });
+  waves = waves.filter(w => w.r < 2.5);
+
+  if (audioEnabled && audioCtx && mainOsc && mainGain) {
+    const el = document.getElementById('mainCanvas');
+    const W = el.offsetWidth;
+    const observerX = W * 0.88;
+    const sx = sourceX * W;
+
+    const distancePixels = sx - observerX;
+    const roadWidthOffset = 35; 
+    const hypotenuse = Math.sqrt(distancePixels * distancePixels + roadWidthOffset * roadWidthOffset);
+    
+    const cosTheta = distancePixels / hypotenuse; 
+    const relativeVelocity = -p.vs * cosTheta; 
+
+    const safe_v_source = Math.min(relativeVelocity, p.v * 0.98);
+    let realTimeFreq = p.f0 * (p.v) / (p.v - safe_v_source);
+
+    const currentSetup = scenarios[currentScenario];
+    mainOsc.type = currentSetup.waveForm;
+    subOsc.type = currentSetup.waveForm;
+
+    if (currentScenario === 'train') {
+      mainOsc.frequency.setTargetAtTime(realTimeFreq, audioCtx.currentTime, 0.01);
+      subOsc.frequency.setTargetAtTime(realTimeFreq * 1.19, audioCtx.currentTime, 0.01);
+    } else if (currentScenario === 'ambulance') {
+      const sirenSweep = Math.sin(time * 14) * 85; 
+      mainOsc.frequency.setTargetAtTime(realTimeFreq + sirenSweep, audioCtx.currentTime, 0.01);
+      subOsc.frequency.setTargetAtTime(0, audioCtx.currentTime, 0.01);
+    } else {
+      mainOsc.frequency.setTargetAtTime(realTimeFreq, audioCtx.currentTime, 0.01);
+      subOsc.frequency.setTargetAtTime(realTimeFreq * 2.0, audioCtx.currentTime, 0.01); 
+    }
+
+    const distanceMeterScale = hypotenuse / 60; 
+    let volumeModel = 0.45 / (distanceMeterScale * distanceMeterScale + 0.5);
+    if (volumeModel > 0.4) volumeModel = 0.4; 
+
+    if (p.vs >= p.v) {
+      const machAngle = Math.asin(p.v / p.vs);
+      const coneBoundaryX = observerX + (roadWidthOffset / Math.tan(machAngle));
+
+      if (sx < coneBoundaryX) {
+        volumeModel = 0; 
+      } else {
+        if (!sonicBoomTriggered) {
+          sonicBoomTriggered = true;
+          mainGain.gain.setValueAtTime(0.85, audioCtx.currentTime);
+          mainGain.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime + 0.08);
+        }
+        mainOsc.type = 'sawtooth';
+        mainOsc.frequency.setValueAtTime(45 + (Math.random() * 15), audioCtx.currentTime);
+        subOsc.frequency.setValueAtTime(90 + (Math.random() * 25), audioCtx.currentTime);
+        volumeModel = Math.min(0.35, 0.6 / (distanceMeterScale + 0.1));
+      }
+    }
+
+    mainGain.gain.setTargetAtTime(volumeModel, audioCtx.currentTime, 0.025);
+  }
+
+  drawMain(p);
+  drawWave(p);
+  raf = requestAnimationFrame(animate);
+}
+
+function drawMain(p) {
+  const el = document.getElementById('mainCanvas');
+  const W = el.offsetWidth; el.width = W; el.height = 220;
+  const ctx = el.getContext('2d');
+  ctx.clearRect(0, 0, W, 220);
+  const H = 220;
+
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath(); ctx.roundRect(0,0,W,H,8); ctx.fill();
+
+  const groundY = H - 28;
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+
+  const observerX = W * 0.88;
+  const sy = groundY - 14;
+
+  const {vs, v} = p;
+  const mach = vs / v;
+
+  if (mach >= 0.98) {
+    const sx2 = sourceX * W;
+    const coneAngle = Math.asin(Math.min(1, v / vs));
+    const coneLen = W * 0.9;
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2.5;
+    ctx.globalAlpha = 0.75;
+    [1,-1].forEach(sign => {
+      ctx.beginPath();
+      ctx.moveTo(sx2, sy);
+      ctx.lineTo(sx2 - coneLen * Math.cos(coneAngle), sy + sign * coneLen * Math.sin(coneAngle));
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.moveTo(sx2, sy);
+    ctx.lineTo(sx2 - coneLen * Math.cos(coneAngle), sy - coneLen * Math.sin(coneAngle));
+    ctx.lineTo(sx2 - coneLen * Math.cos(coneAngle), sy + coneLen * Math.sin(coneAngle));
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+  } else {
+    waves.forEach((w) => {
+      const wx = w.cx * W;
+      const wr = w.r * W;
+      const alpha = Math.max(0, 0.55 - w.age * 0.22);
+      ctx.beginPath();
+      ctx.arc(wx, sy, wr, 0, Math.PI * 2);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = alpha;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  const sx = sourceX * W;
+  const vehicleType = scenarios[currentScenario].type;
+
+  ctx.save();
+  if (vehicleType === 'car') {
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath(); ctx.roundRect(sx - 16, sy - 8, 32, 10, [4, 8, 2, 2]); ctx.fill();
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath(); ctx.roundRect(sx + 2, sy - 14, 10, 7, [4, 4, 0, 0]); ctx.fill();
+    ctx.fillStyle = '#000000';
+    ctx.beginPath(); ctx.arc(sx - 9, sy + 2, 4, 0, Math.PI*2); ctx.arc(sx + 9, sy + 2, 4, 0, Math.PI*2); ctx.fill();
+  } 
+  else if (vehicleType === 'ambulance') {
+    ctx.fillStyle = '#f8fafc';
+    ctx.beginPath(); ctx.roundRect(sx - 18, sy - 18, 36, 20, 3); ctx.fill();
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath(); ctx.roundRect(sx - 18, sy - 6, 36, 4, 0); ctx.fill();
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath(); ctx.roundRect(sx + 8, sy - 14, 8, 6, [0, 3, 0, 0]); ctx.fill();
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath(); ctx.arc(sx - 10, sy - 20, 2, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#000000';
+    ctx.beginPath(); ctx.arc(sx - 10, sy + 2, 4, 0, Math.PI*2); ctx.arc(sx + 10, sy + 2, 4, 0, Math.PI*2); ctx.fill();
+  } 
+  else if (vehicleType === 'train') {
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath(); ctx.roundRect(sx - 22, sy - 14, 44, 16, [2, 10, 2, 2]); ctx.fill();
+    ctx.fillStyle = '#cbd5e1';
+    ctx.beginPath(); ctx.roundRect(sx + 12, sy - 10, 8, 4, [0, 4, 0, 0]); ctx.fill();
+    ctx.fillStyle = '#000000';
+    ctx.beginPath(); ctx.arc(sx - 14, sy + 3, 3, 0, Math.PI*2); ctx.arc(sx, sy + 3, 3, 0, Math.PI*2); ctx.arc(sx + 14, sy + 3, 3, 0, Math.PI*2); ctx.fill();
+  } 
+  else if (vehicleType === 'jet') {
+    ctx.fillStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.moveTo(sx - 24, sy - 4); ctx.lineTo(sx + 24, sy); ctx.lineTo(sx - 24, sy + 4);
+    ctx.lineTo(sx - 18, sy + 12); ctx.lineTo(sx - 16, sy - 12); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath(); ctx.ellipse(sx + 4, sy - 1, 6, 2, 0, 0, Math.PI*2); ctx.fill();
+  } 
+  else {
+    ctx.fillStyle = '#a855f7';
+    ctx.beginPath(); ctx.roundRect(sx - 10, sy - 12, 14, 18, 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(sx + 4, sy - 12); ctx.lineTo(sx + 14, sy - 18); ctx.lineTo(sx + 14, sy + 6); ctx.lineTo(sx + 4, sy); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('Source →', sx, sy - 24);
+
+  ctx.fillStyle = '#10b981'; 
+  ctx.beginPath(); ctx.arc(observerX, sy - 14, 4, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(observerX - 3, sy - 9, 6, 12, 2); ctx.fill();
+  ctx.strokeStyle = '#10b981'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(observerX - 2, sy + 3); ctx.lineTo(observerX - 2, sy + 10);
+  ctx.moveTo(observerX + 2, sy + 3); ctx.lineTo(observerX + 2, sy + 10); ctx.stroke();
+  
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '11px sans-serif';
+  ctx.fillText('Observer', observerX, sy + 22);
+
+  const dp = sx - observerX;
+  const hyp = Math.sqrt(dp*dp + 35*35);
+  const relV = -vs * (dp / hyp);
+  const safe_v_s = Math.min(relV, v * 0.99);
+  const dynamicFreq = Math.round(p.f0 * v / (v - safe_v_s));
+
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '500 12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('Mach ' + (vs/v).toFixed(2), 10, 24);
+  
+  ctx.textAlign = 'right';
+  if (vs >= v && sx < observerX + (35 / Math.tan(Math.asin(v/vs)))) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('Zone of Silence', W - 10, 24);
+  } else {
+    ctx.fillStyle = sx < observerX ? '#f97316' : '#38bdf8';
+    ctx.fillText(dynamicFreq + ' Hz heard', W - 10, 24);
+  }
+  ctx.textAlign = 'left';
+}
+
+function drawWave(p) {
+  const el = document.getElementById('waveCanvas');
+  const W = el.offsetWidth; el.width = W; el.height = 70;
+  const ctx = el.getContext('2d');
+  ctx.clearRect(0, 0, W, 70);
+
+  const {f0, vs, v, vo} = p;
+  const safe_vs = Math.min(vs, v * 0.99);
+  const fa = f0 * (v + vo) / (v - safe_vs);
+  const fr = f0 * (v - vo) / (v + safe_vs);
+  const H2 = 70;
+  const cy = H2 / 2;
+  const midX = W / 2;
+
+  const drawSine = (freq, color, yOffset, label, fromX, toX) => {
+    const cyclesVisible = 6;
+    const waveW = toX - fromX;
+    const lambda = waveW / cyclesVisible;
+    const amplitude = 18;
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.8;
+    for (let x = fromX; x <= toX; x++) {
+      const angle = ((x - fromX) / lambda) * Math.PI * 2;
+      const y = cy + yOffset + Math.sin(angle + time * freq * 0.05) * amplitude;
+      x === fromX ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, (fromX + toX) / 2, 12);
+  };
+
+  drawSine(fa, '#f97316', 0, 'Approaching limits: ' + (isFinite(fa)?Math.round(fa):'∞') + ' Hz', 0, midX - 4);
+  drawSine(fr, '#38bdf8', 0, 'Receding limits: ' + Math.round(fr) + ' Hz', midX + 4, W);
+
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(midX, 0); ctx.lineTo(midX, H2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Source base frequency: ' + f0 + ' Hz', midX, H2 - 4);
+}
+
+onSlide();
+drawMain(getParams());
+drawWave(getParams());
+
+setInterval(() => {
+  if (playing) return;
+  time += 0.016;
+  drawWave(getParams());
+}, 50);
+</script>
